@@ -1,21 +1,46 @@
-name: Build and Deploy Container App
+name: Build, Push, and Scan Container Image
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-scan:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: javiercaro.azurecr.io/myapp:1.0.0
+      POLICY: "Default vulnerabilities policy"
+
     defaults:
       run:
         shell: bash
+
     steps:
-    - uses: actions/checkout@v2
-    - uses: azure/docker-login@v1
-      with:
-        login-server: javiercaro.azurecr.io
-        username: ${{ secrets.REGISTRY_USERNAME }}
-        password: ${{ secrets.REGISTRY_PASSWORD }}
-    - run: |
-        docker build . -t javiercaro.azurecr.io/myapp:1.0.0
-        docker push javiercaro.azurecr.io/myapp:1.0.0
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: javiercaro.azurecr.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build . -t $IMAGE_NAME
+          docker push $IMAGE_NAME
+
+      - name: Download Wiz CLI
+        run: curl -o wizcli https://downloads.wiz.io/wizcli/latest/wizcli-linux-amd64 && chmod +x wizcli
+
+      - name: Authenticate to Wiz
+        run: ./wizcli auth --id "$WIZ_CLIENT_ID" --secret "$WIZ_CLIENT_SECRET"
+        env:
+          WIZ_CLIENT_ID: ${{ secrets.WIZ_CLIENT_ID }}
+          WIZ_CLIENT_SECRET: ${{ secrets.WIZ_CLIENT_SECRET }}
+
+      - name: Scan Docker image with Wiz
+        run: ./wizcli docker scan --image $IMAGE_NAME --policy "$POLICY"
+
+      - name: Tag image in Wiz for enrichment
+        run: ./wizcli docker tag --image $IMAGE_NAME
