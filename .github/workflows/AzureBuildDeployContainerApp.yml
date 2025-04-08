@@ -1,0 +1,21 @@
+name: Build and Deploy Container App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v2
+    - uses: azure/docker-login@v1
+      with:
+        login-server: javiercaro.azurecr.io
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    - run: |
+        docker build . -t javiercaro.azurecr.io/myapp:1.0.0
+        docker push javiercaro.azurecr.io/myapp:1.0.0
